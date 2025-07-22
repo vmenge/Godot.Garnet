@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Godot.NET.Sdk/4.4.1">
   <PropertyGroup>
     <PackageId>vmenge.Godot.Garnet</PackageId>
-    <Version>0.0.2</Version>
+    <Version>0.0.3</Version>
     <Authors>vmenge</Authors>
     <PackageProjectUrl>https://github.com/vmenge/Godot.Garnet</PackageProjectUrl>
     <RepositoryUrl>https://github.com/vmenge/Godot.Garnet</RepositoryUrl>
@@ -9,6 +9,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <TargetFramework>net8.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <FSharpCorePackageVersion>8.0.102</FSharpCorePackageVersion>
   </PropertyGroup>
 
   <ItemGroup>

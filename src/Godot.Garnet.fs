@@ -67,25 +67,39 @@ module private Helpers =
 
     let isEntity (str: StringName) = (string str) = "entity"
 
-    let markerAdders: System.Collections.Generic.IDictionary<string, Entity -> unit> =
-        Assembly.GetExecutingAssembly().GetTypes()
-        |> Seq.choose (fun t ->
+    let markerAdders
+        : System.Collections.Generic.IDictionary<string, Entity -> unit> =
+        AppDomain.CurrentDomain.GetAssemblies()
+        |> Array.collect (fun a -> a.GetTypes())
+        |> Array.choose (fun t ->
             t.GetCustomAttribute<MarkerAttribute>()
             |> Option.ofObj
             |> Option.map (fun attr ->
                 if not t.IsValueType then
                     invalidOp $"{t.FullName} must be struct"
 
-                if t.GetFields(BindingFlags.Instance ||| BindingFlags.Public).Length <> 0 then
+                if
+                    t
+                        .GetFields(
+                            BindingFlags.Instance ||| BindingFlags.Public
+                        )
+                        .Length
+                    <> 0
+                then
                     invalidOp $"{t.FullName} must have no instance fields"
 
                 let entP = Expression.Parameter(typeof<Entity>, "e")
                 let defVal = Expression.Default t
 
                 let call =
-                    System.Linq.Expressions.Expression.Call(entP, withMethod.MakeGenericMethod t, defVal)
+                    System.Linq.Expressions.Expression.Call(
+                        entP,
+                        withMethod.MakeGenericMethod t,
+                        defVal
+                    )
 
-                let lam = Expression.Lambda<Action<Entity>>(call, entP).Compile()
+                let lam =
+                    Expression.Lambda<Action<Entity>>(call, entP).Compile()
 
                 attr.Name, fun e -> lam.Invoke(e)))
         |> dict
@@ -98,8 +112,9 @@ module private Helpers =
             | _ -> ()
 
     let linkAdders: IDictionary<string, Entity -> Node -> unit> =
-        Assembly.GetExecutingAssembly().GetTypes()
-        |> Seq.choose (fun t ->
+        AppDomain.CurrentDomain.GetAssemblies()
+        |> Array.collect (fun a -> a.GetTypes())
+        |> Array.choose (fun t ->
             t.GetCustomAttribute<LinkAttribute>()
             |> Option.ofObj
             |> Option.map (fun attr ->
@@ -108,18 +123,33 @@ module private Helpers =
                 let var = Expression.Variable(t, "v")
 
                 let field =
-                    t.GetFields(BindingFlags.Instance ||| BindingFlags.Public ||| BindingFlags.NonPublic)
+                    t.GetFields(
+                        BindingFlags.Instance
+                        ||| BindingFlags.Public
+                        ||| BindingFlags.NonPublic
+                    )
                     |> Array.head
 
                 let assign =
-                    Expression.Assign(Expression.Field(var, field), Expression.Convert(nodeP, field.FieldType))
+                    Expression.Assign(
+                        Expression.Field(var, field),
+                        Expression.Convert(nodeP, field.FieldType)
+                    )
 
                 let withCall =
-                    System.Linq.Expressions.Expression.Call(entP, withMethod.MakeGenericMethod t, var)
+                    System.Linq.Expressions.Expression.Call(
+                        entP,
+                        withMethod.MakeGenericMethod t,
+                        var
+                    )
 
                 let lam =
                     Expression
-                        .Lambda<Action<Entity, Node>>(Expression.Block([ var ], assign, withCall), entP, nodeP)
+                        .Lambda<Action<Entity, Node>>(
+                            Expression.Block([ var ], assign, withCall),
+                            entP,
+                            nodeP
+                        )
                         .Compile()
 
                 attr.Name, fun e n -> lam.Invoke(e, n)))
@@ -173,7 +203,8 @@ type Container with
             let rec addDesc (parent: Node) =
                 for c in parent.GetChildren() do
                     if c.IsInGroup "entity" then
-                        failwith $"Nested entity '{c.Name}' inside '{parent.Name}'"
+                        failwith
+                            $"Nested entity '{c.Name}' inside '{parent.Name}'"
 
                     tryAddMarkers e c
 

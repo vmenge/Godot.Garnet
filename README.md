@@ -2,20 +2,20 @@
 
 Very exprimental right now, but this is a library meant to help write Godot games with almost all code
 driven completely from the F# side outside of a single glue C# script.
+
 Main feature right now is importing scenes into a `Container` from the **[Garnet](https://github.com/bcarruthers/garnet) ECS** with minimal boilerplate and zero per‑frame allocations,
 but as I work more with Godot and F# I will most likely add any generic relevant helpers here if deemed necessary.
-
----
 
 ## Installation
 
 ```bash
-dotnet add package Godot.Garnet
+dotnet add package vmenge.Godot.Garnet
 ```
 
 ## How It Works
 
-When you bring `Godot.Garnet` into scope, a `ImportScene` is added as a F# extension method to `Garnet.Composition.Container`.
+Godot's [groups](https://docs.godotengine.org/en/4.4/tutorials/scripting/groups.html) are used to tag nodes that should be converted into entities or `Marker` or `Link` components.
+When you bring `Godot.Garnet` into scope, an `ImportScene` extension method is added to `Garnet.Composition.Container`.
 `Container.ImportScene(this, sceneRoot)` walks the subtree rooted at sceneRoot and:
 - Creates an ECS entity for every node in the `entity` group.
 - Adds all children Nodes directly as components to that entity.
@@ -66,7 +66,25 @@ ECS World
 │  ├─ Player                ← link component (holds CharacterBody2D node)
 │  └─ CollisionShape2D      ← node component
 └─ Entity #2
-   └─ SpawnPoint            ← marker component
+   ├─ SpawnPoint            ← marker component
+   └─ Marker2D              ← node component
+```
+
+One big difference between `Marker` and `Link`, is that `Marker` components are added alongside the normal component import chain. `Link` components
+will always be added **instead** of the component it is linked to.
+
+With the above structure, one could query the components through Garnet
+```fs
+let mySystem (c: Container) =
+  c.On<Ready> 
+    <| fun e ->
+        for r in c.Query<SpawnPoint, Marker2D>() do 
+          let marker = r.Value2
+          // do something
+
+        for r in c.Query<Player, CollisionShape2D>() do
+          let characterBody2d, collisionShape2d = r.Value1.Node, r.Value2
+          // do something
 ```
 
 ## Quickstart example
@@ -77,8 +95,8 @@ On the F# project:
 // Main.fs
 module Main
 
-use Godot
-use Godot.Garnet
+open Godot
+open vmenge.Godot.Garnet
 
 [<Struct>]
 type Ready = { Root: Node }
@@ -112,7 +130,6 @@ On the Godot C# project, a single `World.cs` or equivalent is all that is needed
 ```cs
 using Godot;
 using static Main;
-using static Godot.Garnet;
 
 public partial class World : Node2D
 {
@@ -126,7 +143,6 @@ public partial class World : Node2D
 
     public override void _Process(double delta)
     {
-
         world.Container.Run(new Process(this, delta));
     }
 }

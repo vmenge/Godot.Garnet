@@ -1,7 +1,7 @@
 # Godot.Garnet
 
-Very exprimental right now, but this is a library meant to help write Godot games with almost all code
-driven completely from the F# side outside of a single glue C# script.
+Very exprimental library meant to help write Godot games with almost all code
+driven completely from the F# side outside of a *single* glue C# script.
 
 Main feature right now is importing scenes into a `Container` from the **[Garnet](https://github.com/bcarruthers/garnet) ECS** with minimal boilerplate and zero per‑frame allocations,
 but as I work more with Godot and F# I will most likely add any generic relevant helpers here if deemed necessary.

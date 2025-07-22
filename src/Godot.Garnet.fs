@@ -7,6 +7,9 @@ open System.Collections.Generic
 open Godot
 open Garnet.Composition
 
+[<Struct>]
+type Link<'t> = { Entity: Entity }
+
 /// <summary>
 /// Tags a <c>struct</c> that represents a **pure marker component**.
 /// </summary>
@@ -38,9 +41,9 @@ type MarkerAttribute(name: string) =
 /// Tags a <c>struct</c> that links **exactly one** Godot node instance to its entity.
 /// </summary>
 /// <remarks>
-/// • The struct must be a value type and contain **one field** whose type derives from <c>Godot.Node</c>.
+/// • The struct must be a value type and contain a **one field** constructor whose type derives from <c>Godot.Node</c>.
 /// • The attribute’s <c>name</c> must match a Godot group placed on nodes to be linked.
-/// • On import, the converter instantiates the struct, assigns the node to the field, and adds it via <c>Entity.With&lt;T&gt;</c> — zero boxing, zero heap allocations.
+/// • On import, the converter instantiates the struct passing the node to its constructor, and adds it via <c>Entity.With&lt;T&gt;</c> — zero boxing, zero heap allocations.
 /// • When this is done, instead of the <c>Node</c> being added as a component, the <c>struct</c> with the <c>Link</c> attribute is added as a component instead.
 ///
 /// **Example**
@@ -61,6 +64,18 @@ type LinkAttribute(name: string) =
 
 module private Helpers =
     let withMethod = typeof<Entity>.GetMethod "With"
+
+    let getChannel =
+        typeof<IChannels>
+            .GetMethod(
+                "GetChannel",
+                BindingFlags.Instance ||| BindingFlags.Public
+            )
+
+    let sendMethod (evtTy: Type) =
+        typedefof<Channel<_>>
+            .MakeGenericType([| evtTy |])
+            .GetMethod("Send", BindingFlags.Instance ||| BindingFlags.Public)
 
     let inline addComponent (e: Entity) (n: obj) =
         withMethod.MakeGenericMethod(n.GetType()).Invoke(e, [| n |]) |> ignore
@@ -111,7 +126,7 @@ module private Helpers =
             | true, add -> add e
             | _ -> ()
 
-    let linkAdders: IDictionary<string, Entity -> Node -> unit> =
+    let linkAdders: IDictionary<string, Container -> Entity -> Node -> unit> =
         AppDomain.CurrentDomain.GetAssemblies()
         |> Array.collect (fun a -> a.GetTypes())
         |> Array.choose (fun t ->
@@ -120,7 +135,6 @@ module private Helpers =
             |> Option.map (fun attr ->
                 let entP = Expression.Parameter(typeof<Entity>, "e")
                 let nodeP = Expression.Parameter(typeof<Node>, "n")
-                let var = Expression.Variable(t, "v")
 
                 let field =
                     t.GetFields(
@@ -128,11 +142,13 @@ module private Helpers =
                         ||| BindingFlags.Public
                         ||| BindingFlags.NonPublic
                     )
-                    |> Array.head
+                    |> Array.exactlyOne
 
-                let assign =
-                    Expression.Assign(
-                        Expression.Field(var, field),
+                let ctor = t.GetConstructor [| field.FieldType |]
+
+                let valueExpr =
+                    Expression.New(
+                        ctor,
                         Expression.Convert(nodeP, field.FieldType)
                     )
 
@@ -140,29 +156,70 @@ module private Helpers =
                     System.Linq.Expressions.Expression.Call(
                         entP,
                         withMethod.MakeGenericMethod t,
-                        var
+                        valueExpr
                     )
 
                 let lam =
                     Expression
-                        .Lambda<Action<Entity, Node>>(
-                            Expression.Block([ var ], assign, withCall),
-                            entP,
-                            nodeP
+                        .Lambda<Action<Entity, Node>>(withCall, entP, nodeP)
+                        .Compile()
+
+                let linkEvtTy = typedefof<Link<_>>.MakeGenericType [| t |]
+                let eidP = Expression.Parameter(typeof<Entity>, "eid")
+
+                let mkMsg =
+                    Expression
+                        .Lambda<Func<Entity, obj>>(
+                            Expression.Convert(
+                                Expression.New(
+                                    linkEvtTy.GetConstructor [|
+                                        typeof<Entity>
+                                    |],
+                                    eidP
+                                ),
+                                typeof<obj>
+                            ),
+                            eidP
                         )
                         .Compile()
 
-                attr.Name, fun e n -> lam.Invoke(e, n)))
+                // sendEvt : IChannels * obj -> unit
+                let chanP = Expression.Parameter(typeof<IChannels>, "ch")
+                let msgP = Expression.Parameter(typeof<obj>, "m")
+
+                let getCh =
+                    System.Linq.Expressions.Expression.Call(
+                        chanP,
+                        getChannel.MakeGenericMethod linkEvtTy
+                    )
+
+                let callSend =
+                    System.Linq.Expressions.Expression.Call(
+                        getCh,
+                        sendMethod linkEvtTy,
+                        Expression.Convert(msgP, linkEvtTy)
+                    )
+
+                let sendEvt =
+                    Expression
+                        .Lambda<Action<IChannels, obj>>(callSend, chanP, msgP)
+                        .Compile()
+
+                attr.Name,
+                fun c e n ->
+                    lam.Invoke(e, n)
+                    let msg = mkMsg.Invoke e
+                    sendEvt.Invoke(c :> IChannels, msg) |> ignore))
         |> dict
 
 
-    let tryAddLink (e: Entity) (n: Node) =
+    let tryAddLink c (e: Entity) (n: Node) =
         let links =
             n.GetGroups()
             |> Seq.filter (fun g ->
                 match linkAdders.TryGetValue(string g) with
                 | true, f ->
-                    f e n
+                    f c e n
                     true
                 | _ -> false)
 
@@ -192,26 +249,26 @@ type Container with
     /// • The entire conversion is allocation‑free at run time:
     ///   reflection and delegate generation happen once at startup.
     /// </remarks>
-    member c.ImportScene(sceneRoot: Node) =
+    member container.ImportScene(sceneRoot: Node) =
         let rec buildEntity (n: Node) =
-            let e = c.Create()
+            let e = container.Create()
             tryAddMarkers e n
 
-            if not <| tryAddLink e n then
+            if not <| tryAddLink container e n then
                 addComponent e n
 
             let rec addDesc (parent: Node) =
-                for c in parent.GetChildren() do
-                    if c.IsInGroup "entity" then
+                for child in parent.GetChildren() do
+                    if child.IsInGroup "entity" then
                         failwith
-                            $"Nested entity '{c.Name}' inside '{parent.Name}'"
+                            $"Nested entity '{child.Name}' inside '{parent.Name}'"
 
-                    tryAddMarkers e c
+                    tryAddMarkers e child
 
-                    if not <| tryAddLink e c then
-                        addComponent e c
+                    if not <| tryAddLink container e child then
+                        addComponent e child
 
-                    addDesc c
+                    addDesc child
 
             addDesc n
 

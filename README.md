@@ -96,7 +96,7 @@ On the F# project:
 module Main
 
 open Godot
-open vmenge.Godot.Garnet
+open Godot.Garnet
 
 [<Struct>]
 type Ready = { Root: Node }

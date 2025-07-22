@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Godot.Garnet", "Godot.Garnet.fsproj", "{8F3C7929-9391-4C99-8E3D-1DA6BDA31FEC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8F3C7929-9391-4C99-8E3D-1DA6BDA31FEC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F3C7929-9391-4C99-8E3D-1DA6BDA31FEC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F3C7929-9391-4C99-8E3D-1DA6BDA31FEC}.Release|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F3C7929-9391-4C99-8E3D-1DA6BDA31FEC}.Release|Any CPU.Build.0 = Debug|Any CPU
+	EndGlobalSection
+EndGlobal

@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Godot.NET.Sdk/4.4.1">
   <PropertyGroup>
     <PackageId>vmenge.Godot.Garnet</PackageId>
-    <Version>0.0.1</Version>
+    <Version>0.0.2</Version>
     <Authors>vmenge</Authors>
     <PackageProjectUrl>https://github.com/vmenge/Godot.Garnet</PackageProjectUrl>
     <RepositoryUrl>https://github.com/vmenge/Godot.Garnet</RepositoryUrl>

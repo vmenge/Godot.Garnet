@@ -88,7 +88,8 @@ let mySystem (c: Container) =
 ```
 
 ## Quickstart example
-Full project examples will be in the `/examples` folder on the repo soon, but one should be able to get started with something as simple as the following:
+An implementation of Godot's *Dodge the Creeps* can be found in [this repo](https://github.com/vmenge/dodge_the_creeps_fsharp). 
+Though one should be able to get started with something as simple as the following:
 
 On the F# project:
 ```fs
